@@ -52,46 +52,64 @@ export function AIAssistantWidget() {
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [filteredMessages, setFilteredMessages] = useState([]);
+  const [filteredMessages, setFilteredMessages] = useState<any[]>([]);
+  const [needsReset, setNeedsReset] = useState(false);
 
   // Initialize with VImaTe system prompt
   useEffect(() => {
     if (!isInitialized) {
-      initializeChat(VIMATE_SYSTEM_PROMPT);
-      setIsInitialized(true);
+      // Reset any existing chat first
+      clearMessages();
+      
+      // Short delay before initializing
+      setTimeout(() => {
+        initializeChat(VIMATE_SYSTEM_PROMPT);
+        setIsInitialized(true);
+      }, 100);
     }
-  }, [initializeChat, isInitialized]);
+  }, [initializeChat, isInitialized, clearMessages]);
 
-  // Filter messages to remove system instructions
+  // Filter out system prompts aggresively
   useEffect(() => {
-    const filtered = messages.filter(msg => {
-      // Remove all system role messages
+    // Reset chat if we detect system messages in the UI
+    if (needsReset) {
+      clearMessages();
+      setTimeout(() => {
+        initializeChat(VIMATE_SYSTEM_PROMPT);
+        setNeedsReset(false);
+      }, 100);
+      return;
+    }
+
+    // Filter out ALL system messages
+    const cleanMessages = messages.filter(msg => {
+      // Never show system messages
       if (msg.role === "system") return false;
       
-      // Check if the message contains identifiers of system instructions
-      const containsSystemInstructions = SYSTEM_PROMPT_IDENTIFIERS.some(identifier => 
-        msg.content.includes(identifier)
+      // Check multiple identifiers to catch any instances of the system prompt 
+      const isSystemPrompt = SYSTEM_PROMPT_IDENTIFIERS.some(phrase => 
+        msg.content && msg.content.includes(phrase)
       );
       
-      return !containsSystemInstructions;
+      if (isSystemPrompt) {
+        // Schedule a reset if we find a system prompt in the messages
+        setNeedsReset(true);
+        return false;
+      }
+      
+      return true;
     });
     
-    // If we accidentally filtered out all messages, add a welcome message
-    if (filtered.length === 0 && messages.length > 0) {
-      filtered.push({
+    // If we have no messages to show but we're initialized, add a welcome message
+    if (cleanMessages.length === 0 && isInitialized && !needsReset) {
+      cleanMessages.push({
         role: "model",
         content: "Hello! I'm your VImaTe AI assistant. How can I help you with VIT Chennai-related questions today?"
       });
     }
     
-    setFilteredMessages(filtered);
-    
-    // If we detected system messages in user-visible content, restart the chat
-    if (messages.length > filtered.length + 1) { // +1 accounts for the hidden system message
-      clearMessages();
-      initializeChat(VIMATE_SYSTEM_PROMPT);
-    }
-  }, [messages, clearMessages, initializeChat]);
+    setFilteredMessages(cleanMessages);
+  }, [messages, clearMessages, initializeChat, isInitialized, needsReset]);
 
   // Get the last message from user and AI if they exist
   const lastUserMessage = filteredMessages.filter(m => m.role === "user").pop();

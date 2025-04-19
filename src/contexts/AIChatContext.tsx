@@ -58,18 +58,23 @@ export const AIChatProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Initialize chat with custom or default system prompt
   const initializeChat = useCallback((systemPrompt: string = SYSTEM_PROMPT) => {
+    // Set ONLY the system message first
     const systemMessage: ChatMessage = {
       role: "system",
       content: systemPrompt
     };
     
-    const welcomeMessage: ChatMessage = {
-      role: "model",
-      content: "Hello! I'm your VImaTe AI assistant. How can I help you with VIT Chennai-related questions today?",
-    };
+    // Set only the system message
+    setMessages([systemMessage]);
     
-    // Start with only system and welcome message - never show system prompt to user
-    setMessages([systemMessage, welcomeMessage]);
+    // Then add the welcome message separately to avoid any risk of the system prompt being shown
+    setTimeout(() => {
+      setMessages(prev => [...prev, {
+        role: "model",
+        content: "Hello! I'm your VImaTe AI assistant. How can I help you with VIT Chennai-related questions today?"
+      }]);
+    }, 100);
+    
     setError(null);
   }, []);
 
